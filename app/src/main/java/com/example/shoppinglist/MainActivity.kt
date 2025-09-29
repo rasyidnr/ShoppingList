@@ -25,7 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.shoppinglist.component.ItemInput
 import com.example.shoppinglist.component.SearchInput
-import com.example.shoppinglist.component.ShoppingList
+import com.example.shoppinglist.components.ShoppingList
 import com.example.shoppinglist.component.Title
 import com.example.shoppinglist.ui.theme.ShoppingListTheme
 import androidx.compose.ui.tooling.preview.Preview

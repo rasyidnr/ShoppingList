@@ -3,97 +3,144 @@ package com.example.shoppinglist
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import com.example.shoppinglist.component.ItemInput
-import com.example.shoppinglist.component.SearchInput
-import com.example.shoppinglist.components.ShoppingList
-import com.example.shoppinglist.component.Title
-import com.example.shoppinglist.ui.theme.ShoppingListTheme
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.example.shoppinglist.ui.theme.ShoppingListTheme
+import kotlinx.coroutines.launch
 
+data class NavItem(val label: String, val icon: ImageVector, val route: String)
+
+@OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            ShoppingListTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    ShoppingListApp()
-                }
-            }
+            ShoppingListApp()
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShoppingListApp() {
-    var newItemText by rememberSaveable { mutableStateOf("") }
-    var searchQuery by rememberSaveable { mutableStateOf("") }
-    val shoppingItems = remember { mutableStateListOf<String>() }
+    val isSystemInDark = isSystemInDarkTheme()
+    var isDarkMode by rememberSaveable { mutableStateOf(isSystemInDark) }
 
-    val filteredItems by remember(searchQuery, shoppingItems) {
-        derivedStateOf {
-            if (searchQuery.isBlank()) {
-                shoppingItems
-            } else {
-                shoppingItems.filter { it.contains(searchQuery,
-                    ignoreCase = true) }
-            }
-        }
-    }
+    ShoppingListTheme(darkTheme = isDarkMode) {
+        val shoppingItems = remember { mutableStateListOf<String>() }
+        var searchQuery by rememberSaveable { mutableStateOf("") }
+        var newItemText by rememberSaveable { mutableStateOf("") }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(WindowInsets.safeDrawing.asPaddingValues())
-            .padding(horizontal = 16.dp)
-    ) {
-        Title()
-        ItemInput(
-            text = newItemText,
-            onTextChange = { newItemText = it },
-            onAddItem = {
-                if (newItemText.isNotBlank()) {
-                    shoppingItems.add(newItemText)
-                    newItemText = ""
+        val navController = rememberNavController()
+        val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+        val scope = rememberCoroutineScope()
+
+        val navItems = listOf(
+            NavItem("Shopping List", Icons.Default.Home, "shopping_list"),
+            NavItem("Profile", Icons.Default.AccountCircle, "profile")
+        )
+
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                ModalDrawerSheet {
+                    NavigationDrawerItem(
+                        label = { Text("Settings") },
+                        selected = false,
+                        icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            navController.navigate("settings") {
+                                launchSingleTop = true
+                            }
+                        }
+                    )
                 }
             }
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        SearchInput(
-            query = searchQuery,
-            onQueryChange = { searchQuery = it }
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        ShoppingList(items = filteredItems)
+        ) {
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = { Text("ShoppingList App") },
+                        navigationIcon = {
+                            IconButton(onClick = {
+                                scope.launch { drawerState.open() }
+                            }) {
+                                Icon(Icons.Default.Menu, contentDescription = "Menu")
+                            }
+                        }
+                    )
+                },
+                bottomBar = {
+                    NavigationBar {
+                        val navBackStackEntry by navController.currentBackStackEntryAsState()
+                        val currentRoute = navBackStackEntry?.destination?.route
+
+                        navItems.forEach { item ->
+                            NavigationBarItem(
+                                selected = currentRoute == item.route,
+                                onClick = {
+                                    navController.navigate(item.route) {
+                                        launchSingleTop = true
+                                    }
+                                },
+                                icon = { Icon(item.icon, contentDescription = item.label) },
+                                label = { Text(item.label) }
+                            )
+                        }
+                    }
+                }
+            ) { innerPadding ->
+                NavHost(
+                    navController = navController,
+                    startDestination = "shopping_list",
+                    modifier = Modifier.padding(innerPadding)
+                ) {
+                    composable("shopping_list") {
+                        ShoppingListScreen(
+                            items = shoppingItems,
+                            searchQuery = searchQuery,
+                            newItemText = newItemText,
+                            onQueryChange = { searchQuery = it },
+                            onNewItemTextChange = { newItemText = it },
+                            onAddItem = {
+                                if (newItemText.isNotBlank()) {
+                                    shoppingItems.add(0, newItemText)
+                                    newItemText = ""
+                                }
+                            }
+                        )
+                    }
+                    composable("profile") { ProfileScreen() }
+                    composable("settings") {
+                        SettingsScreen(
+                            isDarkMode = isDarkMode,
+                            onThemeChange = { isDarkMode = it }
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
 @Preview(showBackground = true)
 @Composable
-fun ShoppingListAppPreview() {
-    ShoppingListTheme {
-        ShoppingListApp()
-    }
+fun AppPreview() {
+    ShoppingListApp()
 }
